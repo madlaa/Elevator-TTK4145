@@ -2,7 +2,7 @@ Repository description
 ------
 Student project developed during the spring of 2015 as part of the course "TTK4145 Sanntidsprogrammering" at the Norwegian University of Science and Technology (NTNU). The project was a collaboration between Mads Laastad and Tommy Berntzen. 
 
-We had a lot of fun while working on this project and decided to produce an unconventional and original solution to the problem. It is not the most efficient solution, but it was an interesting learning experience and scored 20.1/25 in the factory stress test and subsequent code review. We decided to implement a UDP based communication system between the elevators with the intention to never identify the other elevators in the system. 
+We had a lot of fun while working on this project and decided to produce an unconventional and original solution to the problem. It is not the most efficient solution, but it was an interesting learning experience and scored 20.1/25 in the factory stress test and subsequent code review. Our solution implemented a UDP based communication system between the elevators with the intention to never identify the other elevators in the system. The resulting real-time system proved to be robust in stress tests regarding a sudden loss of one or more elevators, but the inability to directly communicate could sometimes result in a long response time to redistribute uncompleated orders from a sudden elevator loss.
 
 The project assignment is listed below.
 
