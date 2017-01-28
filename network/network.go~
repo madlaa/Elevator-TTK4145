@@ -1,0 +1,146 @@
+package network
+
+import(
+	"fmt"
+	."net"
+	"encoding/json"
+	"../global"
+	"time"
+)
+
+/*const(
+	OrderReceiveAddr, _ = ResolveUDPAddr("udp", global.BROADCAST+global.ORDER_RECEIVE_PORT)
+	LocalOrderReceiveListen,_ = ListenUDP("udp", OrderReceiveAddr)
+	OrderReceiveConn, _ = DialUDP("udp", nil, OrderReceiveAddr)
+	
+	CostAddr, _ = ResolveUDPAddr("udp", global.BROADCAST+global.COST_PORT)
+	LocalCostListen,_ := ListenUDP("udp", CostAddr)
+	CostConn, _ := DialUDP("udp", nil, CostAddr)
+	
+	OrderRemoveAddr, _ := ResolveUDPAddr("udp", global.BROADCAST+global.ORDER_REMOVAL_PORT)
+	LocalOrderRemoveListen,_ := ListenUDP("udp", OrderRemoveAddr)
+	OrderRemoveConn, _ := DialUDP("udp", nil, OrderRemoveAddr)
+
+	Buffer = make([]byte,1024)
+)*/
+
+func NetworkInit() (*UDPConn, *UDPConn, *UDPConn, *UDPConn, *UDPConn, *UDPConn, []byte){
+	OrderReceiveAddr, _ :=  ResolveUDPAddr("udp", global.BROADCAST+global.ORDER_RECEIVE_PORT)
+	LocalOrderReceiveListen,_ := ListenUDP("udp", OrderReceiveAddr)
+	OrderReceiveConn, _ := DialUDP("udp", nil, OrderReceiveAddr)
+	
+	CostAddr, _ := ResolveUDPAddr("udp", global.BROADCAST+global.COST_PORT)
+	LocalCostListen,_ := ListenUDP("udp", CostAddr)
+	CostConn, _ := DialUDP("udp", nil, CostAddr)
+	
+	OrderRemoveAddr, _ := ResolveUDPAddr("udp", global.BROADCAST+global.ORDER_REMOVAL_PORT)
+	LocalOrderRemoveListen,_ := ListenUDP("udp", OrderRemoveAddr)
+	OrderRemoveConn, _ := DialUDP("udp", nil, OrderRemoveAddr)
+
+	Buffer := make([]byte,1024)
+	return LocalOrderReceiveListen, OrderReceiveConn, LocalCostListen, CostConn, LocalOrderRemoveListen, OrderRemoveConn, Buffer
+}
+
+func GlobalOrderSender(orderReceiveConn *UDPConn, order global.Button){
+	stopSending := 0
+	for{
+		b, err := json.Marshal(order)
+		if err == nil{
+			orderReceiveConn.Write([]byte(b))	
+		}else{
+			fmt.Println("Could not send Order, check for bugs", err)
+		}
+		stopSending ++
+		if stopSending > global.NUMBER_OF_NETWORK_PACKAGES {
+			break
+		}
+		time.Sleep(global.SENDING_SLEEP_TIME)
+	}
+}
+
+func GlobalOrderReceiver(globalOrderChan chan global.Button, localOrderReceiveListen *UDPConn, buffer []byte){
+	var lastKnownOrder global.Button
+	for{
+		n,_,_ := localOrderReceiveListen.ReadFromUDP(buffer) //Implement error-handling?
+		var temp global.Button
+		err:= json.Unmarshal(buffer[:n], &temp)
+		if err == nil{
+			if lastKnownOrder != temp || (lastKnownOrder != temp && global.IsResend){
+			globalOrderChan <- temp
+			global.IsResend = false
+			fmt.Println("mongo", global.IsResend)
+			}
+		} else {
+			fmt.Println("Could not Receive orderdata, check type", err)
+		}
+		//lastKnownOrder = temp
+		time.Sleep(global.RECIVING_SLEEP_TIME)
+	}
+}
+
+func GlobalOrderRemoveSender(orderRemoveConn *UDPConn, orderRemove global.Button){
+	stopSending := 0
+	for{
+		b, err := json.Marshal(orderRemove)
+		if err == nil{
+			orderRemoveConn.Write([]byte(b))
+			}else{
+				fmt.Println("Could not send ", orderRemove," check for bugs: ", err)
+			}
+		stopSending ++
+		if stopSending > global.NUMBER_OF_NETWORK_PACKAGES {
+			break
+		}
+		time.Sleep(global.SENDING_SLEEP_TIME)
+	}
+}
+
+func GlobalOrderRemoveReceiver(globalOrderRemoveChan chan global.Button, localOrderRemoveListen *UDPConn, buffer []byte){
+	for{
+		n,_,_ := localOrderRemoveListen.ReadFromUDP(buffer)
+		var temp global.Button
+		err:= json.Unmarshal(buffer[:n], &temp)
+		if err == nil{
+			globalOrderRemoveChan <- temp
+			fmt.Println("Mangomamma")
+		} else {
+			fmt.Println("Could not receive orderRemove. Check type and error:", err)
+		}
+		time.Sleep(global.SENDING_SLEEP_TIME)
+	}
+}
+
+func GlobalCostSender(costConn *UDPConn, cost global.Order){
+	stopSending := 0
+	for{
+		b, err := json.Marshal(cost)
+		if err == nil{
+			costConn.Write([]byte(b))
+		}else{
+			fmt.Println("Could not pack/send Cost, check for bugs", err)
+		}
+		stopSending ++
+		if stopSending > global.NUMBER_OF_NETWORK_PACKAGES {
+			break
+		}
+		time.Sleep(global.SENDING_SLEEP_TIME)
+	}
+}
+
+func GlobalCostReceiver(globalCostChan chan global.Order, localCostListen *UDPConn, buffer []byte){
+	var lastKnownCost global.Order
+	for{
+		n,_,_ := localCostListen.ReadFromUDP(buffer)
+		var temp global.Order
+		err:= json.Unmarshal(buffer[:n], &temp)
+		if err == nil{
+			if lastKnownCost != temp{
+				globalCostChan <- temp
+			}
+		} else {
+			fmt.Println("Could not Receive data, check type", err)
+		}
+		lastKnownCost = temp
+		time.Sleep(global.RECIVING_SLEEP_TIME)
+	}
+}
